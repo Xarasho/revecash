@@ -1,0 +1,31 @@
+export enum ExpenseCategory {
+  FOOD = "food",
+  TRANSPORT = "transport",
+  UTILITIES = "utilities",
+  ENTERTAINMENT = "entertainment",
+  HEALTHCARE = "healthcare",
+  SHOPPING = "shopping",
+  EDUCATION = "education",
+  SAVINGS = "savings",
+  OTHER = "other",
+}
+
+export interface Expense {
+  id: string;
+  userId: string;
+  amount: number;
+  category: ExpenseCategory;
+  description: string;
+  date: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
