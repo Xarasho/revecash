@@ -36,3 +36,8 @@ export interface ApiResponse<T> {
   message?: string;
   error?: string;
 }
+
+export interface AuthResponse {
+  user: Omit<User, "password">;
+  token?: string;
+}
