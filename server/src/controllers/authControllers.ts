@@ -1,6 +1,6 @@
 import { ApiResponse, AuthResponse, User } from "../types";
 import { Request, Response } from 'express';
-
+import crypto from 'node:crypto';
 
 let fakeUsers: User[] = [
   {
