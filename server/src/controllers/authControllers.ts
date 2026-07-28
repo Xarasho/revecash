@@ -108,4 +108,28 @@ export const login = (req: Request, res: Response) => {
 
   res.status(201).json(response);
 
-}; 
+};
+
+export const getProfile = (req: Request, res: Response) => {
+  const userId = "user123"
+
+  const user = fakeUsers.find(user => user.id === userId)
+
+  if ( !user ) {
+    const response: ApiResponse<null> = {
+      success: false,
+      error: "User not found",
+    };
+    res.status(404).json(response);
+    return;
+  }
+
+  const { password: _, ...userWithoutPassword } = user;
+
+  const response: ApiResponse<Omit<User, "password">> = {
+    success: true,
+    data: userWithoutPassword,
+  };
+
+  res.status(200).json(response);
+};
