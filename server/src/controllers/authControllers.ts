@@ -133,3 +133,50 @@ export const getProfile = (req: Request, res: Response) => {
 
   res.status(200).json(response);
 };
+
+export const updateProfile = (req: Request, res: Response) => {
+  const { name, email } = req.body
+
+  const userId = "user123"
+  
+  const userIndex = fakeUsers.findIndex(user => user.id === userId)
+
+  if ( userIndex === -1 ) {
+    const response: ApiResponse<null> = {
+      success: false,
+      error: "User not found"
+    };
+    res.status(404).json(response);
+    return;
+  }
+
+  if ( email && email !== fakeUsers[userIndex].email ) {
+    const emailExists = fakeUsers.find(user => user.email === email)
+
+    if (emailExists) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: "Email already in use"
+      };
+      res.status(409).json(response);
+      return;
+    }
+  }
+
+  fakeUsers[userIndex] = {
+    ...fakeUsers[userIndex],
+    name: name || fakeUsers[userIndex].name,
+    email: email || fakeUsers[userIndex].email,
+    updatedAt: new Date(),
+  };
+
+  const { password: _, ...userWithoutPassword } = fakeUsers[userIndex];
+
+  const response: ApiResponse<Omit<User, "password">> = {
+    success: true,
+    data: userWithoutPassword,
+    message: "Profile updated successfully",
+  };
+
+  res.status(200).json(response);
+};
