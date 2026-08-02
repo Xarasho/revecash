@@ -1,5 +1,8 @@
-import { Request, Response } from 'express';
-import { ApiResponse, Expense, ExpenseCategory } from '../types';
+import { NextFunction, Request, Response } from "express";
+import { ApiResponse, Expense, ExpenseCategory } from "../types";
+import { asyncHandler, sendSuccess } from "../utils/responseHelpers";
+import { AppError } from "../middleware/errorHandler";
+import crypto from "node:crypto";
 
 let fakeExpenses: Expense[] = [
   {
@@ -24,126 +27,166 @@ let fakeExpenses: Expense[] = [
   },
 ];
 
-export const getAllExpenses = (req: Request, res: Response) => {
-  const response: ApiResponse<Expense[]> = {
-      success: true,
-      data: fakeExpenses,
-      message: "Expenses retrieved successfully",
-    };
-    
-    res.status(200).json(response);
-};
+export const getAllExpenses = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    sendSuccess(res, fakeExpenses, "Expenses retrieved successfully");
+  },
+);
 
-export const getExpenseById = (req: Request, res: Response) => {
-  const { id } = req.params;
-    
+export const getExpenseById = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
     const expense = fakeExpenses.find((exp) => exp.id === id);
-    
-    if (!expense) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: "Expense not found",
-      };
-      
-      return res.status(404).json(response);
-    }
-    
-    const response: ApiResponse<Expense> = {
-      success: true,
-      data: expense,
-    };
-    
-    res.status(200).json(response);
-};
 
-export const createExpense = (req: Request, res: Response) => {
-    
-    const { amount, category, description, date } = req.body;
-    
-    if (!amount || !category || !description) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: "Please provide amount, category and description",
-      };
-      return res.status(400).json(response);
+    if (!expense) {
+      throw new AppError("Expense not found", 404);
     }
-    
+
+    sendSuccess(res, expense, "Expense retrieved successfully");
+  },
+);
+
+export const createExpense = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { amount, category, description, date } = req.body;
+
+    if (!amount) {
+      throw new AppError("Amount is required", 400);
+    }
+    if (!category) {
+      throw new AppError("Category is required", 400);
+    }
+    if (!description) {
+      throw new AppError("Description is required", 400);
+    }
+
+    // Validation - Data Types
+    if (typeof amount !== "number") {
+      throw new AppError("Amount must be a number", 400);
+    }
+
+    // Validation - Business Logic
+    if (amount <= 0) {
+      throw new AppError("Amount must be greater than 0", 400);
+    }
+
+    if (amount > 1000000) {
+      throw new AppError("Amount cannot exceed 1,000,000", 400);
+    }
+
+    // Validation - Category
+    const validCategories = Object.values(ExpenseCategory);
+    if (!validCategories.includes(category)) {
+      throw new AppError(
+        `Invalid category. Must be one of: ${validCategories.join(", ")}`,
+        400,
+      );
+    }
+
+    // Validation - Description
+    if (description.length < 3) {
+      throw new AppError("Description must be at least 3 characters", 400);
+    }
+    if (description.length > 100) {
+      throw new AppError("Description cannot exceed 100 characters", 400);
+    }
+
     const newExpense: Expense = {
       id: crypto.randomUUID(),
-      userId: "user123", 
+      userId: "user123",
       amount,
       category,
-      description,
-      date: date ? new Date(date): new Date(),
+      description: description.trim(),
+      date: date ? new Date(date) : new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     fakeExpenses.push(newExpense);
-    
-    const response: ApiResponse<Expense> = {
-      success: true, 
-      data: newExpense,
-      message: "Expense created successfully",
+
+    sendSuccess(res, newExpense, "Expense created successfully", 201);
+  },
+);
+
+export const updateExpense = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const { amount, category, description, date } = req.body;
+
+    const expenseIndex = fakeExpenses.findIndex((expense) => expense.id === id);
+
+    if (expenseIndex === -1) {
+      throw new AppError("Expense not found", 404);
+    }
+
+    // Validation - Provided Fields
+    // Amount
+    if (amount !== undefined) {
+      if (typeof amount !== "number") {
+        throw new AppError("Amount is undefinded", 400);
+      }
+
+      if (amount <= 0) {
+        throw new AppError("Amount must be greater than 0", 400);
+      }
+
+      if (amount > 1000000) {
+        throw new AppError("Amount cannot exceed 1,000,000", 400);
+      }
+    }
+
+    // Category
+    if (category !== undefined) {
+      const validCategories = Object.values(ExpenseCategory);
+      if (!validCategories.includes(category)) {
+        throw new AppError(
+          `Invalid category. Must be one of: ${validCategories.join(", ")}`,
+          400,
+        );
+      }
+    }
+
+    // Description
+    if (description !== undefined) {
+      if (description.length < 3) {
+        throw new AppError("Description must be at least 3 characters", 400);
+      }
+      if (description.length > 100) {
+        throw new AppError("Description cannot exceed 100 characters", 400);
+      }
+    }
+
+    fakeExpenses[expenseIndex] = {
+      ...fakeExpenses[expenseIndex],
+      amount: amount || fakeExpenses[expenseIndex].amount,
+      category: category || fakeExpenses[expenseIndex].category,
+      description: description || fakeExpenses[expenseIndex].description,
+      date: date ? new Date(date) : fakeExpenses[expenseIndex].date,
+
+      updatedAt: new Date(),
     };
-    
-    res.status(201).json(response);
-};
 
-export const updateExpense = (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { amount, category, description, date } = req.body;
+    sendSuccess(
+      res,
+      fakeExpenses[expenseIndex],
+      "Expense updated successfully",
+    );
+  },
+);
 
-  const expenseId = fakeExpenses.findIndex(expense => expense.id === id);
+export const deleteExpense = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+      const { id } = req.params;
 
-  if (expenseId === -1) {
-    const response: ApiResponse<null> = {
-      success: false,
-      error: "Expense not found",
-    };
-    return res.status(404).json(response);
-  }
+    const expenseIndex = fakeExpenses.findIndex((expense) => expense.id === id);
 
-  fakeExpenses[expenseId] = {
-    ...fakeExpenses[expenseId],
-    amount: amount || fakeExpenses[expenseId].amount,
-    category: category || fakeExpenses[expenseId].category,
-    description: description || fakeExpenses[expenseId].description,
-    date: date ? new Date(date) : fakeExpenses[expenseId].date,
-    
-    updatedAt: new Date(),
-  }
+    if (expenseIndex === -1) {
+      throw new AppError("Expense not found", 404)
+    }
 
-  const response: ApiResponse<Expense> = {
-    success: true,
-    data: fakeExpenses[expenseId],
-    message: "Expense updated successfully",
-  };
+    fakeExpenses.splice(expenseIndex, 1);
 
-  res.status(200).json(response);
-};
-
-export const deleteExpense = (req: Request, res: Response) => {
-  
-  const { id } = req.params;
-  
-  const expenseId = fakeExpenses.findIndex(expense => expense.id === id);
-
-  if (expenseId === -1) {
-    const response: ApiResponse<null> = {
-      success: false,
-      error: "Expense not found",
-    };
-    return res.status(404).json(response);
-  }
-
-  fakeExpenses.splice(expenseId, 1);
-
-  const response: ApiResponse<null> = {
-    success: true,
-    message: "Expense deleted successfully",
-  };
-
-  res.status(200).json(response);
-
-};
+    sendSuccess(res, null, "Expense deleted successfully")
+  },
+);
